@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>TWC Lease Watch</title>
+<meta name="description" content="Upcoming check-ins and check-outs, and expired leases not yet checked out in TheOfficeMonk.">
+<meta name="theme-color" content="#1d5966">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lease Watch">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working column — attention band first, then upcoming moves, then the full register. */
+:root{
+  --bg:#eef1f0; --surface:#ffffff; --ink:#15201e; --muted:#5b6b67; --line:#d5dcda;
+  --accent:#1d5966; --accent-ink:#ffffff; --accent-soft:#dbe8ea;
+  --bad:#b42318; --bad-soft:#fde8e6; --warn:#a15c00; --warn-soft:#fdf0d9; --good:#1f7a4a; --good-soft:#e2f3e9;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#111816; --surface:#19221f; --ink:#e6eeeb; --muted:#93a39f; --line:#2c3935;
+  --accent:#6fb3c2; --accent-ink:#0d1a1d; --accent-soft:#1d3237;
+  --bad:#ff8a7e; --bad-soft:#3a1d1a; --warn:#f2b34e; --warn-soft:#352813; --good:#6fd39b; --good-soft:#16301f; color-scheme:dark}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+.wrap{max-width:860px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 48px;display:flex;flex-direction:column;gap:22px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:700;font-size:1.9rem;letter-spacing:-.01em;margin:0;line-height:1.05;text-wrap:balance}
+.today{font-family:var(--f-mono);font-size:.8rem;color:var(--muted);margin-top:4px}
+.status{font-size:.78rem;color:var(--muted);margin-top:2px}
+.status.err{color:var(--bad)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 13px;font-weight:500;font-size:.9rem}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.6;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.small{padding:5px 10px;font-size:.82rem}
+button.danger{color:var(--bad)}
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;text-align:left}
+.tile b{font-family:var(--f-display);font-size:1.7rem;line-height:1;font-variant-numeric:tabular-nums}
+.tile span{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.tile.bad b{color:var(--bad)} .tile.warn b{color:var(--warn)}
+@media (max-width:560px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.windowbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:.88rem;color:var(--muted)}
+.chip{border-radius:999px;padding:4px 12px;font-size:.84rem}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+section{display:flex;flex-direction:column;gap:8px}
+h2{font-family:var(--f-display);font-weight:600;font-size:1.15rem;margin:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+h2 .count{font-family:var(--f-mono);font-size:.8rem;font-weight:500;color:var(--muted)}
+section.alert{background:var(--bad-soft);border-radius:12px;padding:14px}
+section.alert h2{color:var(--bad)}
+.hint{font-size:.84rem;color:var(--muted);margin:0}
+.list{display:flex;flex-direction:column;gap:6px}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
+.row .who{min-width:0}
+.row .client{font-weight:600;overflow-wrap:anywhere}
+.row .where{font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
+.row .dates{font-family:var(--f-mono);font-size:.78rem;color:var(--muted)}
+.row .acts{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;align-items:center}
+.pill{font-size:.78rem;font-weight:600;border-radius:999px;padding:3px 9px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.good{background:var(--good-soft);color:var(--good)} .pill.neutral{background:var(--accent-soft);color:var(--ink)}
+.more{align-self:flex-start}
+@media (max-width:520px){.row{grid-template-columns:minmax(0,1fr)}.row .acts{justify-content:flex-start}}
+.empty{border:1px dashed var(--line);border-radius:9px;padding:14px;color:var(--muted);font-size:.9rem;background:var(--surface)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+.toolbar input{flex:1 1 200px;width:auto}
+.toolbar select{width:auto}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:680px;font-size:.88rem}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:.74rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+td.mono{font-family:var(--f-mono);font-size:.8rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+.overlay{position:fixed;inset:0;background:rgba(10,20,18,.45);display:flex;align-items:flex-start;justify-content:center;padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));overflow-y:auto;z-index:20}
+.sheet{background:var(--surface);color:var(--ink);border-radius:14px;padding:18px;width:100%;max-width:480px;display:flex;flex-direction:column;gap:12px;border:1px solid var(--line)}
+.sheet h3{font-family:var(--f-display);margin:0;font-size:1.25rem}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:420px){.grid2{grid-template-columns:1fr}}
+label{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:var(--muted);font-weight:500}
+label.check{flex-direction:row;align-items:center;gap:8px;color:var(--ink);font-size:.9rem}
+label.check input{width:auto}
+.sheet .end{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.meta{font-size:.78rem;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:.88rem;z-index:30;max-width:calc(100% - 32px);text-align:center}
+pre.copybox{white-space:pre-wrap;font-family:var(--f-mono);font-size:.78rem;background:var(--bg);border-radius:8px;padding:10px;max-height:300px;overflow:auto;margin:0}
+.install{background:var(--accent-soft);border-radius:10px;padding:10px 12px;font-size:.86rem;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>TWC Lease Watch</h1>
+      <div class="today" id="today"></div>
+      <div class="status" id="status">Loading…</div>
+    </div>
+    <div class="btns">
+      <button id="btnRefresh" title="Reload from the sheet">Refresh</button>
+      <button id="btnCopy">Copy reminder list</button>
+      <button class="primary" id="btnAdd">Add lease</button>
+    </div>
+  </header>
+
+  <div class="install" id="installBar" hidden>
+    <span id="installText">Add Lease Watch to your home screen so it opens like an app.</span>
+    <span class="btns"><button class="small primary" id="btnInstall" hidden>Install</button><button class="small" id="btnInstallClose">Not now</button></span>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <section class="alert" id="secOverdue">
+    <h2>Lease expired, not checked out in POS <span class="count" id="cOverdue"></span></h2>
+    <p class="hint">The lease end date has passed but TheOfficeMonk still shows the client as in. Check out in TheOfficeMonk, then tick it here.</p>
+    <div class="list" id="listOverdue"></div>
+  </section>
+
+  <section id="secMissedIn" hidden>
+    <h2>Check-in date passed, not checked in <span class="count" id="cMissedIn"></span></h2>
+    <div class="list" id="listMissedIn"></div>
+  </section>
+
+  <div class="windowbar" id="windowbar"></div>
+
+  <section>
+    <h2>Upcoming check-outs <span class="count" id="cOut"></span></h2>
+    <div class="list" id="listOut"></div>
+  </section>
+
+  <section>
+    <h2>Upcoming check-ins <span class="count" id="cIn"></span></h2>
+    <div class="list" id="listIn"></div>
+  </section>
+
+  <section>
+    <h2>All leases <span class="count" id="cAll"></span></h2>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Search client, property or unit" autocomplete="off">
+      <select id="propFilter"><option value="">All properties</option></select>
+      <select id="statusFilter">
+        <option value="active">Not checked out</option>
+        <option value="all">All</option>
+        <option value="done">Checked out</option>
+      </select>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Client</th><th>Property · Unit</th><th>Check-in</th><th>Lease end</th><th>POS status</th><th></th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <button class="more small" id="btnMoreRows" hidden>Show more</button>
+    <p class="hint">Leases sync from TheOfficeMonk every weekday morning. Leases you add here stay unless you delete them. <button class="small" id="btnName" style="margin-left:4px">Change my name</button></p>
+  </section>
+</div>
+
+<div id="overlayRoot"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbw2c1BXFQoSeyl3Re-0tKv-nu-vxiMZ6NvUP10wA0MuQ1p6l46ddN5yFjuW2t4hDu4cRA/exec";
+
+(function(){
+const pad = n => String(n).padStart(2,'0');
+function sgToday(){ const d=new Date(Date.now()+8*3600e3); return d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate()); }
+let TODAY = sgToday();
+const dayNum = s => { if(!s) return null; const [y,m,d]=s.split('-').map(Number); return Math.round(Date.UTC(y,m-1,d)/864e5); };
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmt = s => { if(!s) return '—'; const [y,m,d]=s.split('-'); return d+' '+MON[+m-1]+' '+y; };
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $ = id => document.getElementById(id);
+
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+
+const state = {
+  leases: lsGet('lw-cache', []),
+  win: lsGet('lw-window',14),
+  q:'', prop:'', status: lsGet('lw-status','active'),
+  code: lsGet('lw-code',''), name: lsGet('lw-name',''),
+  rowsShown: 100, loaded:false, busy:0
+};
+
+function setStatus(msg, err){ const s=$('status'); s.textContent=msg; s.classList.toggle('err',!!err); }
+function lastSynced(){ const s=state.leases.map(l=>l.syncedOn).filter(Boolean).sort().pop(); return s?('Synced from TheOfficeMonk '+fmt(s)):'Not synced from TheOfficeMonk yet'; }
+
+/* ---------- API ---------- */
+async function apiGet(){
+  const u = API_URL + '?code=' + encodeURIComponent(state.code||'') + '&t=' + Date.now();
+  const r = await fetch(u, {cache:'no-store'});
+  return r.json();
+}
+async function apiPost(body){
+  const r = await fetch(API_URL, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(Object.assign({code:state.code, by:state.name}, body))});
+  const j = await r.json();
+  if(!j.ok) throw new Error(j.error||'failed');
+  return j;
+}
+async function load(quiet){
+  if(!quiet) setStatus(state.leases.length?'Refreshing…':'Loading…');
+  try{
+    const j = await apiGet();
+    if(!j.ok && j.error==='code'){ askSetup(true); setStatus('Enter the access code to continue.'); return; }
+    if(!j.ok) throw new Error(j.error);
+    if(j.today) TODAY=j.today;
+    state.leases=j.leases; state.loaded=true; lsSet('lw-cache', j.leases);
+    setStatus(lastSynced()); render();
+    if(!state.name) askSetup(false);
+  }catch(e){
+    setStatus((state.leases.length?'Offline · showing the last saved copy. ':'Could not reach the sheet. ')+'Tap Refresh to try again.', true);
+    render();
+  }
+}
+async function save(fn, okMsg){
+  state.busy++; setStatus('Saving…');
+  try{ await fn(); if(okMsg) toast(okMsg); lsSet('lw-cache', state.leases); setStatus('Saved · '+lastSynced()); }
+  catch(e){ toast(e.message==='code'?'The access code has changed. Enter the new one.':'Could not save. Check your connection and try again.'); if(e.message==='code') askSetup(true); load(true); }
+  finally{ state.busy--; }
+}
+function replaceLocal(l){ const i=state.leases.findIndex(x=>x.id===l.id); if(i>=0) state.leases[i]=l; else state.leases.push(l); }
+function updateLease(id,patch,msg){
+  const l=state.leases.find(x=>x.id===id); if(l){ Object.assign(l,patch); if(l.posOut) l.posIn=true; render(); }
+  save(async()=>{ const j=await apiPost({action:'update',id,patch}); replaceLocal(j.lease); render(); }, msg);
+}
+
+/* ---------- classification ---------- */
+function classify(l){
+  const T=dayNum(TODAY);
+  const dIn = l.checkIn ? dayNum(l.checkIn)-T : null;
+  const dOut = l.leaseEnd ? dayNum(l.leaseEnd)-T : null;
+  return { dIn, dOut,
+    overdue: l.posIn && !l.posOut && dOut!==null && dOut<0,
+    dueOut: !l.posOut && dOut!==null && dOut>=0 && dOut<=state.win,
+    missedIn: !l.posIn && !l.posOut && dIn!==null && dIn<0,
+    dueIn: !l.posIn && !l.posOut && dIn!==null && dIn>=0 && dIn<=state.win };
+}
+const rel = d => d===0?'today':d===1?'tomorrow':d>0?'in '+d+' days':(-d)+(d===-1?' day':' days')+' ago';
+const where = l => [l.property,l.unit].filter(Boolean).join(' · ');
+
+/* ---------- render ---------- */
+const LIMIT = {overdue:25, missedIn:15, out:50, in:50};
+const expanded = {};
+function rowHTML(l,kind){
+  const c=classify(l); let pill='',btn='',dateLine;
+  if(kind==='overdue'){pill=`<span class="pill bad">${-c.dOut} day${c.dOut===-1?'':'s'} overdue</span>`;btn=`<button class="small primary" data-act="out" data-id="${l.id}">Checked out in POS</button>`;}
+  if(kind==='out'){pill=`<span class="pill ${c.dOut<=3?'warn':'neutral'}">Out ${rel(c.dOut)}</span>`;btn=`<button class="small" data-act="out" data-id="${l.id}">Checked out in POS</button>`;}
+  if(kind==='in'){pill=`<span class="pill ${c.dIn<=3?'warn':'neutral'}">In ${rel(c.dIn)}</span>`;btn=`<button class="small" data-act="in" data-id="${l.id}">Checked in</button>`;}
+  if(kind==='missedIn'){pill=`<span class="pill warn">Was due ${rel(c.dIn)}</span>`;btn=`<button class="small primary" data-act="in" data-id="${l.id}">Checked in</button>`;}
+  dateLine = (kind==='in'||kind==='missedIn') ? 'Check-in '+fmt(l.checkIn) : 'Lease end '+fmt(l.leaseEnd);
+  return `<div class="row"><div class="who"><div class="client">${esc(l.client)}</div><div class="where">${esc(where(l))}</div><div class="dates">${dateLine}${l.notes?' · '+esc(l.notes):''}</div></div>
+  <div class="acts">${pill}${btn}<button class="small" data-act="edit" data-id="${l.id}">Edit</button></div></div>`;
+}
+function fill(listId,countId,items,kind,emptyMsg){
+  $(countId).textContent=items.length;
+  const lim = expanded[kind] ? items.length : LIMIT[kind];
+  $(listId).innerHTML = items.length ? items.slice(0,lim).map(l=>rowHTML(l,kind)).join('') + (items.length>lim?`<button class="small more" data-more="${kind}">Show all ${items.length}</button>`:'') : `<div class="empty">${emptyMsg}</div>`;
+}
+function render(){
+  const L=state.leases, cls=new Map(L.map(l=>[l.id,classify(l)]));
+  const by=(k,f)=>L.filter(l=>cls.get(l.id)[k]).sort((a,b)=>f(cls.get(a.id))-f(cls.get(b.id)));
+  const overdue=by('overdue',c=>-c.dOut*-1), dueOut=by('dueOut',c=>c.dOut), dueIn=by('dueIn',c=>c.dIn), missedIn=by('missedIn',c=>-c.dIn*-1);
+  overdue.sort((a,b)=>b.leaseEnd.localeCompare(a.leaseEnd)); missedIn.sort((a,b)=>b.checkIn.localeCompare(a.checkIn));
+  $('today').textContent='Today · '+fmt(TODAY);
+  $('summary').innerHTML=[['bad',overdue.length,'Expired, not out'],['warn',missedIn.length,'Missed check-in'],['',dueOut.length,`Out in ${state.win} days`],['',dueIn.length,`In in ${state.win} days`]]
+    .map(([k,n,t])=>`<div class="tile ${n?k:''}"><b>${n}</b><span>${t}</span></div>`).join('');
+  if(!state.loaded && !L.length){ $('listOverdue').innerHTML='<div class="empty">Loading leases…</div>'; return; }
+  fill('listOverdue','cOverdue',overdue,'overdue', L.length?'All clear. Every expired lease has been checked out.':'No leases yet.');
+  $('secMissedIn').hidden=!missedIn.length; fill('listMissedIn','cMissedIn',missedIn,'missedIn','');
+  fill('listOut','cOut',dueOut,'out',`No check-outs in the next ${state.win} days.`);
+  fill('listIn','cIn',dueIn,'in',`No check-ins in the next ${state.win} days.`);
+  $('windowbar').innerHTML='<span>Show upcoming in the next</span>'+[7,14,30,60,90].map(n=>`<button class="chip" aria-pressed="${n===state.win}" data-win="${n}">${n} days</button>`).join('');
+
+  const props=[...new Set(L.map(l=>l.property).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  const pf=$('propFilter'); const cur=state.prop;
+  pf.innerHTML='<option value="">All properties</option>'+props.map(p=>`<option${p===cur?' selected':''}>${esc(p)}</option>`).join('');
+  const q=state.q.toLowerCase();
+  const rows=L.filter(l=>{
+    if(state.status==='active'&&l.posOut) return false;
+    if(state.status==='done'&&!l.posOut) return false;
+    if(state.prop&&l.property!==state.prop) return false;
+    return !q||[l.client,l.property,l.unit,l.notes].join(' ').toLowerCase().includes(q);
+  }).sort((a,b)=>(a.leaseEnd||'9999').localeCompare(b.leaseEnd||'9999'));
+  $('cAll').textContent=rows.length;
+  $('tbody').innerHTML=rows.length?rows.slice(0,state.rowsShown).map(l=>{
+    const c=cls.get(l.id);
+    const st=l.posOut?'<span class="pill good">Checked out</span>':c.overdue?'<span class="pill bad">Expired · still in</span>':l.posIn?'<span class="pill neutral">Checked in</span>':'<span class="pill warn">Not checked in</span>';
+    return `<tr><td><b>${esc(l.client)}</b></td><td>${esc(where(l))}</td><td class="mono">${fmt(l.checkIn)}</td><td class="mono">${fmt(l.leaseEnd)}</td><td>${st}</td><td><button class="small" data-act="edit" data-id="${l.id}">Edit</button></td></tr>`;
+  }).join(''):`<tr><td colspan="6" style="color:var(--muted)">No leases match.</td></tr>`;
+  $('btnMoreRows').hidden=rows.length<=state.rowsShown;
+  $('statusFilter').value=state.status;
+}
+
+/* ---------- setup: access code + name ---------- */
+function askSetup(needCode){
+  if($('setupForm')) return;
+  $('overlayRoot').innerHTML=`<div class="overlay"><form class="sheet" id="setupForm">
+    <h3>Welcome to Lease Watch</h3>
+    <p class="hint">Your name shows on the changes you make. ${needCode?'Ask your manager for the access code.':''}</p>
+    <label>Your name<input id="s_name" required value="${esc(state.name)}" autocomplete="name"></label>
+    ${needCode?`<label>Access code<input id="s_code" required autocomplete="off"></label>`:''}
+    <div class="end"><span></span><button class="primary" type="submit">Continue</button></div></form></div>`;
+  $('setupForm').onsubmit=e=>{ e.preventDefault(); state.name=$('s_name').value.trim(); lsSet('lw-name',state.name);
+    if(needCode){ state.code=$('s_code').value.trim(); lsSet('lw-code',state.code); }
+    $('overlayRoot').innerHTML=''; if(needCode) load(); };
+  $('s_name').focus();
+}
+
+/* ---------- lease form ---------- */
+function openForm(l){
+  const isNew=!l; l=l||{client:'',property:'',unit:'',checkIn:'',leaseEnd:'',posIn:false,posOut:false,notes:''};
+  const root=$('overlayRoot');
+  root.innerHTML=`<div class="overlay" id="ov"><form class="sheet" id="leaseForm">
+    <h3>${isNew?'Add lease':'Edit lease'}</h3>
+    ${l.source==='TheOfficeMonk'?`<p class="hint">From TheOfficeMonk (#${esc(l.tomId)}). Dates and units are updated by the morning sync, so change them in TheOfficeMonk.</p>`:''}
+    <label>Client company<input id="f_client" required value="${esc(l.client)}"></label>
+    <div class="grid2">
+      <label>Property<input id="f_property" placeholder="e.g. 1 KS" value="${esc(l.property)}"></label>
+      <label>Unit<input id="f_unit" placeholder="e.g. Workspace 11" value="${esc(l.unit)}"></label>
+      <label>Check-in date<input id="f_in" type="date" value="${esc(l.checkIn)}"></label>
+      <label>Lease end (check-out)<input id="f_out" type="date" value="${esc(l.leaseEnd)}"></label>
+    </div>
+    <label class="check"><input type="checkbox" id="f_posIn" ${l.posIn?'checked':''}> Checked in on POS</label>
+    <label class="check"><input type="checkbox" id="f_posOut" ${l.posOut?'checked':''}> Checked out on POS</label>
+    <label>Notes<textarea id="f_notes" rows="2">${esc(l.notes||'')}</textarea></label>
+    ${!isNew&&l.updatedAt?`<div class="meta">Last changed ${esc(l.updatedAt.replace('T',' ').slice(0,16))}${l.updatedBy?' by '+esc(l.updatedBy):''}${l.checkedOutOn?' · checked out '+fmt(l.checkedOutOn):''}</div>`:''}
+    <div class="end">
+      <div>${isNew?'':'<button type="button" class="danger" id="f_del">Delete</button>'}</div>
+      <div class="btns"><button type="button" id="f_cancel">Cancel</button><button class="primary" type="submit">Save</button></div>
+    </div></form></div>`;
+  const close=()=>root.innerHTML='';
+  $('f_cancel').onclick=close;
+  $('ov').onclick=e=>{if(e.target.id==='ov')close();};
+  if(!isNew) $('f_del').onclick=function(){
+    if(this.dataset.armed){ close(); state.leases=state.leases.filter(x=>x.id!==l.id); render(); save(()=>apiPost({action:'delete',id:l.id}),'Lease deleted'); }
+    else { this.dataset.armed='1'; this.textContent='Tap again to delete'; }
+  };
+  $('leaseForm').onsubmit=e=>{
+    e.preventDefault();
+    const data={client:$('f_client').value.trim(),property:$('f_property').value.trim(),unit:$('f_unit').value.trim(),
+      checkIn:$('f_in').value,leaseEnd:$('f_out').value,posIn:$('f_posIn').checked,posOut:$('f_posOut').checked,notes:$('f_notes').value.trim()};
+    if(data.posOut) data.posIn=true;
+    close();
+    if(isNew) save(async()=>{ const j=await apiPost({action:'add',lease:data}); state.leases.push(j.lease); render(); },'Lease added');
+    else updateLease(l.id,data,'Saved');
+  };
+  $('f_client').focus();
+}
+
+/* ---------- reminder text ---------- */
+function reminderText(){
+  const L=state.leases,C=l=>classify(l), line=(l,t)=>`• ${l.client} (${where(l)}) — ${t}`;
+  const ov=L.filter(l=>C(l).overdue).sort((a,b)=>b.leaseEnd.localeCompare(a.leaseEnd));
+  const mi=L.filter(l=>C(l).missedIn), o=L.filter(l=>C(l).dueOut).sort((a,b)=>a.leaseEnd.localeCompare(b.leaseEnd)), i=L.filter(l=>C(l).dueIn).sort((a,b)=>a.checkIn.localeCompare(b.checkIn));
+  const p=['TWC lease reminders — '+fmt(TODAY)];
+  if(ov.length) p.push(`\nEXPIRED, NOT CHECKED OUT IN POS (${ov.length}):`,...ov.map(l=>line(l,'ended '+fmt(l.leaseEnd))));
+  if(mi.length) p.push(`\nCHECK-IN DATE PASSED, NOT CHECKED IN (${mi.length}):`,...mi.map(l=>line(l,'was due '+fmt(l.checkIn))));
+  p.push(`\nCHECK-OUTS (next ${state.win} days):`,...(o.length?o.map(l=>line(l,fmt(l.leaseEnd)+', '+rel(C(l).dOut))):['• None']));
+  p.push(`\nCHECK-INS (next ${state.win} days):`,...(i.length?i.map(l=>line(l,fmt(l.checkIn)+', '+rel(C(l).dIn))):['• None']));
+  return p.join('\n');
+}
+function copyReminders(){
+  const txt=reminderText();
+  const show=()=>{ $('overlayRoot').innerHTML=`<div class="overlay" id="ov"><div class="sheet"><h3>Reminder list</h3><pre class="copybox" id="cb">${esc(txt)}</pre><div class="end"><span class="hint">Select the text above and copy it.</span><button id="c_close">Close</button></div></div></div>`;
+    $('c_close').onclick=()=>$('overlayRoot').innerHTML=''; const r=document.createRange(); r.selectNodeContents($('cb')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); };
+  if(navigator.share && /Mobi|Android|iPhone/i.test(navigator.userAgent)){ navigator.share({title:'Lease reminders',text:txt}).catch(()=>{}); return; }
+  try{ navigator.clipboard.writeText(txt).then(()=>toast('Copied. Paste into WhatsApp or email.'),show); }catch(e){ show(); }
+}
+
+/* ---------- install prompt ---------- */
+let deferredPrompt=null;
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+if(!standalone && !lsGet('lw-install-dismissed',false)){
+  if(/iPhone|iPad|iPod/i.test(navigator.userAgent)){ $('installText').textContent='To add Lease Watch to your home screen, tap Share, then “Add to Home Screen”.'; $('installBar').hidden=false; }
+  window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredPrompt=e; $('btnInstall').hidden=false; $('installBar').hidden=false; });
+}
+$('btnInstall').onclick=async()=>{ if(!deferredPrompt) return; deferredPrompt.prompt(); await deferredPrompt.userChoice.catch(()=>{}); deferredPrompt=null; $('installBar').hidden=true; };
+$('btnInstallClose').onclick=()=>{ $('installBar').hidden=true; lsSet('lw-install-dismissed',true); };
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+/* ---------- events ---------- */
+let tt; function toast(m){ const t=$('toast'); t.textContent=m; t.hidden=false; clearTimeout(tt); tt=setTimeout(()=>t.hidden=true,2800); }
+document.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.win){ state.win=+b.dataset.win; lsSet('lw-window',state.win); render(); return; }
+  if(b.dataset.more){ expanded[b.dataset.more]=true; render(); return; }
+  const id=b.dataset.id, l=id&&state.leases.find(x=>x.id===id);
+  if(b.dataset.act==='edit'&&l) openForm(l);
+  if(b.dataset.act==='out'&&l) updateLease(id,{posOut:true,posIn:true},l.client+' marked checked out');
+  if(b.dataset.act==='in'&&l) updateLease(id,{posIn:true},l.client+' marked checked in');
+});
+$('btnAdd').onclick=()=>openForm(null);
+$('btnCopy').onclick=copyReminders;
+$('btnRefresh').onclick=()=>load();
+$('btnName').onclick=()=>askSetup(false);
+$('btnMoreRows').onclick=()=>{ state.rowsShown+=200; render(); };
+$('search').oninput=e=>{state.q=e.target.value;state.rowsShown=100;render();};
+$('propFilter').onchange=e=>{state.prop=e.target.value;state.rowsShown=100;render();};
+$('statusFilter').onchange=e=>{state.status=e.target.value;lsSet('lw-status',state.status);render();};
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && !state.busy){ TODAY=sgToday(); load(true); } });
+
+if(state.leases.length) setStatus(lastSynced()+' · refreshing…');
+render();
+load(true);
+})();
+</script>
+</body>
+</html>
