@@ -42,6 +42,23 @@ const css = `
 .legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
 th.sort{cursor:pointer;user-select:none}
 th.sort:hover{color:var(--ink)}
+/* wide screens: use the width */
+.wrap{max-width:1480px}
+.remGrid{display:flex;flex-direction:column;gap:22px}
+.remCol{display:flex;flex-direction:column;gap:22px;min-width:0}
+.dmain,.dsplit{display:flex;flex-direction:column;gap:14px;min-width:0}
+@media (min-width:1000px){
+  .remGrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start}
+  #dashView{display:grid!important;grid-template-columns:300px minmax(0,1fr);align-items:start;gap:18px!important}
+  #dashView[hidden]{display:none!important}
+  #dashView .filters{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+  #dashView .frow,#dashView .fdates{grid-template-columns:1fr}
+  #dashView .fdates label{min-width:0}
+  #dashView input[type=date]{min-width:0;width:100%;padding:6px 6px;font-size:13px}
+  .dsplit{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);align-items:start}
+  .dsplit .bars{position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+}
+@media (min-width:1000px) and (max-width:1250px){ .dsplit{grid-template-columns:1fr} .dsplit .bars{position:static;max-height:none} }
 `;
 const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
 
@@ -84,17 +101,28 @@ dash.innerHTML=`
   </div>
   <div class="factions"><span class="hint" id="d_summary"></span><span class="btns"><button class="small" id="d_csv">Download CSV</button><button class="small" id="d_clear">Clear filters</button></span></div>
 </div>
+<div class="dmain">
 <div class="dkpi" id="d_kpi"></div>
+<div class="dsplit">
 <section><h2>By property <span class="count" id="d_pcount"></span></h2>
   <div class="bars" id="d_bars"></div>
 </section>
-<section><h2>Leases <span class="count" id="d_count"></span></h2>
+<section style="min-width:0"><h2>Leases <span class="count" id="d_count"></span></h2>
   <div class="tablewrap"><table>
     <thead><tr><th class="sort" data-sort="client">Client</th><th class="sort" data-sort="property">Property · Unit</th><th class="sort" data-sort="checkIn">Check-in</th><th class="sort" data-sort="leaseEnd">Lease end</th><th class="sort" data-sort="status">POS status</th><th></th></tr></thead>
     <tbody id="d_body"></tbody></table></div>
   <button class="more small" id="d_more" hidden>Show more</button>
-</section>`;
+</section>
+</div></div>`;
 tabs.after(dash);
+
+/* Reminders tab: expired + missed check-ins on the left, upcoming on the right */
+const remGrid=document.createElement('div'); remGrid.className='remGrid';
+const colL=document.createElement('div'), colR=document.createElement('div'); colL.className=colR.className='remCol';
+const secOver=$('secOverdue'), secMiss=$('secMissedIn'), winbar=$('windowbar');
+const secOut=$('listOut').closest('section'), secIn=$('listIn').closest('section');
+secOver.before(remGrid); remGrid.append(colL,colR);
+colL.append(secOver,secMiss); colR.append(winbar,secOut,secIn);
 
 /* quick date ranges */
 const pad=n=>String(n).padStart(2,'0');
