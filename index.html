@@ -302,6 +302,7 @@ function render(){
   }).join(''):`<tr><td colspan="6" style="color:var(--muted)">No leases match.</td></tr>`;
   $('btnMoreRows').hidden=rows.length<=state.rowsShown;
   $('statusFilter').value=state.status;
+  if(window.LW&&LW.onRender) LW.onRender();
 }
 
 /* ---------- setup: access code + name ---------- */
@@ -412,10 +413,12 @@ $('propFilter').onchange=e=>{state.prop=e.target.value;state.rowsShown=100;rende
 $('statusFilter').onchange=e=>{state.status=e.target.value;lsSet('lw-status',state.status);render();};
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && !state.busy){ TODAY=sgToday(); load(true); } });
 
+window.LW={state,classify,fmt,esc,where,today:()=>TODAY};
 if(state.leases.length) setStatus(lastSynced()+' · refreshing…');
 render();
 load(true);
 })();
 </script>
+<script src="dashboard.js"></script>
 </body>
 </html>
